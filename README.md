@@ -1,2 +1,0 @@
-# mezzo
-anima website
