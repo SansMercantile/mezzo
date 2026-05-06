@@ -9,6 +9,15 @@ import About from '@/pages/About';
 import Core from '@/pages/Core';
 import Collaborate from '@/pages/Collaborate';
 import { Toaster } from '@/components/ui/toaster';
+import { useEffect } from 'react';
+
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+}
 
 function App() {
   const location = useLocation();
@@ -17,6 +26,7 @@ function App() {
     <div className="flex flex-col min-h-screen">
       <Background />
       <Header />
+      <ScrollToTop />
       <main className="flex-grow relative z-10">
         <AnimatePresence mode="wait">
           <Routes location={location} key={location.pathname}>
