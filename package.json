@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 {
   "name": "mezzo-website",
   "version": "1.0.0",
@@ -10,30 +9,11 @@
   },
   "dependencies": {
     "react": "^18.3.0",
-    "react-dom": "^18.3.0"
+    "react-dom": "^18.3.0",
+    "@auth0/auth0-react": "^2.2.4"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^6.0.2",
     "vite": "^8.0.13"
   }
 }
-=======
-{
-  "name": "mezzo-website",
-  "version": "1.0.0",
-  "private": true,
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "react": "^18.3.0",
-    "react-dom": "^18.3.0"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-react": "^6.0.2",
-    "vite": "^8.0.13"
-  }
-}
->>>>>>> 41c611558eacbda891029336dfc1359f8978bc14
