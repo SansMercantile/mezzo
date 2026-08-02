@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
+import { Analytics } from "@vercel/analytics/react";
 
 /* ─── constants ─────────────────────────────── */
 const G = "#C9A84C", GL = "#FDE88A", BG = "#FDFCF8", W = BG, INK = "#1a1208";
@@ -1392,5 +1393,7 @@ export default function App() {
       <Rays />
       <Nav page={page} nav={nav} />
       <Page nav={nav} />
+      <Analytics />
     </>
   );
+}
