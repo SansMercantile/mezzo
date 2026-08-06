@@ -1031,7 +1031,7 @@ function Preservation() {
 
 /* ─── DASHBOARD (app layout) ─────────────────── */
 const DASH_NAV = [
-  { id: "Overview", label: "Overview" }, { id: "Projects", label: "Projects" },
+  { id: "Overview", label: "Overview" }, { id: "Setup", label: "Setup" }, { id: "Projects", label: "Projects" },
   { id: "Resources", label: "Resources" }, { id: "Safety", label: "Safety" },
   { id: "Schedule", label: "Schedule" }, { id: "Analytics", label: "Analytics" },
   { id: "System", label: "System" },
@@ -1319,7 +1319,7 @@ function DashSystem() {
   );
 }
 
-const DASH_PANELS = { Overview: DashOverview, Projects: DashProjects, Resources: DashResources, Safety: DashSafety, Schedule: DashSchedule, Analytics: DashAnalytics, System: DashSystem };
+const DASH_PANELS = { Overview: DashOverview, Setup: DashSetup, Projects: DashProjects, Resources: DashResources, Safety: DashSafety, Schedule: DashSchedule, Analytics: DashAnalytics, System: DashSystem };
 
 function Dashboard({ nav }) {
   const [tab, setTab] = useState("Overview");
@@ -1395,5 +1395,148 @@ export default function App() {
       <Page nav={nav} />
       <Analytics />
     </>
+  );
+}
+
+function DashSetup() {
+  const { getAccessTokenSilently, user } = useAuth0();
+  const [profile, setProfile] = useState(null);
+  const [identityStatus, setIdentityStatus] = useState(null);
+  const [agentType, setAgentType] = useState("MEZZO_MATERNA");
+  const [setupName, setSetupName] = useState("");
+  const [setupRelationship, setSetupRelationship] = useState("");
+  const [agentResult, setAgentResult] = useState(null);
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
+
+  const API_BASE = import.meta.env.VITE_MEZZO_API_BASE_URL || "";
+
+  async function apiFetch(path, options = {}) {
+    if (!API_BASE) throw new Error("Backend not configured yet -- set VITE_MEZZO_API_BASE_URL.");
+    const token = await getAccessTokenSilently({
+      authorizationParams: { audience: "https://api.mezzo.sansmercantile.com" },
+    });
+    const resp = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers: { ...(options.headers || {}), Authorization: `Bearer ${token}` },
+    });
+    if (!resp.ok) throw new Error(`${resp.status}: ${await resp.text()}`);
+    return resp.json();
+  }
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setProfile(await apiFetch("/mezzo/profile"));
+        setIdentityStatus(await apiFetch("/mezzo/identity/status"));
+      } catch (e) {
+        setError(e.message);
+      }
+    })();
+  }, []);
+
+  async function handleIdentityUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    setBusy("identity"); setError("");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const result = await apiFetch(`/mezzo/identity/submit?document_type=government_id`, { method: "POST", body: formData });
+      setIdentityStatus({ status: "pending_review", ...result });
+    } catch (e) { setError(e.message); } finally { setBusy(""); }
+  }
+
+  async function handleCreateAgent() {
+    setBusy("agent"); setError("");
+    try {
+      const result = await apiFetch(`/mezzo/setup/${agentType}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: setupName, relationship: setupRelationship }),
+      });
+      setAgentResult(result);
+    } catch (e) { setError(e.message); } finally { setBusy(""); }
+  }
+
+  async function connectSocial(platform) {
+    setBusy(platform); setError("");
+    try {
+      const { authorization_url } = await apiFetch(`/mezzo/social/${platform}/authorize`);
+      window.location.href = authorization_url;
+    } catch (e) { setError(e.message); setBusy(""); }
+  }
+
+  async function handleImportUpload(platform, e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    setBusy(`import_${platform}`); setError("");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const result = await apiFetch(`/mezzo/import/${platform}`, { method: "POST", body: formData });
+      alert(`Imported ${result.items_imported} items from ${platform}.`);
+    } catch (e) { setError(e.message); } finally { setBusy(""); }
+  }
+
+  const stepStyle = { background: "#FFFEF8", border: "1px solid #C9A84C10", padding: 18, marginBottom: 12 };
+  const labelStyle = { fontFamily: "'Cinzel',serif", fontSize: 8, letterSpacing: "0.16em", textTransform: "uppercase", color: G, marginBottom: 8, display: "block" };
+
+  if (!API_BASE) {
+    return <div style={stepStyle}><div style={labelStyle}>Not Configured</div><p style={{ fontSize: 13, color: "#999" }}>The backend hasn't been deployed yet -- VITE_MEZZO_API_BASE_URL is unset.</p></div>;
+  }
+
+  return (
+    <div>
+      {error && <div style={{ ...stepStyle, borderColor: "#c0392b", color: "#c0392b", fontSize: 12 }}>{error}</div>}
+
+      <div style={stepStyle}>
+        <div style={labelStyle}>Step 1 — Your Profile</div>
+        {profile ? (
+          <p style={{ fontSize: 13 }}>{profile.display_name || profile.email} · onboarding: <strong>{profile.onboarding_status}</strong></p>
+        ) : <p style={{ fontSize: 13, color: "#999" }}>Loading...</p>}
+      </div>
+
+      <div style={stepStyle}>
+        <div style={labelStyle}>Step 2 — Identity Verification (human-reviewed)</div>
+        {identityStatus?.status === "approved" ? (
+          <p style={{ fontSize: 13, color: G }}>Verified.</p>
+        ) : identityStatus?.status === "pending_review" ? (
+          <p style={{ fontSize: 13, color: "#999" }}>Submitted — awaiting human review.</p>
+        ) : identityStatus?.status === "rejected" ? (
+          <p style={{ fontSize: 13, color: "#c0392b" }}>Rejected: {identityStatus.reviewer_notes}. You may resubmit.</p>
+        ) : null}
+        <input type="file" accept="image/*,application/pdf" disabled={busy === "identity"} onChange={handleIdentityUpload} style={{ fontSize: 12, marginTop: 6 }} />
+      </div>
+
+      <div style={stepStyle}>
+        <div style={labelStyle}>Step 3 — Create a Persona</div>
+        <select value={agentType} onChange={e => setAgentType(e.target.value)} style={{ fontSize: 12, padding: 6, marginBottom: 8, display: "block" }}>
+          <option value="MEZZO_MATERNA">Mother</option>
+          <option value="MEZZO_PATERNA">Father</option>
+          <option value="MEZZO_GENERAL">Loved one</option>
+          <option value="MEZZO_MEMORY_COLLECTOR">Myself</option>
+        </select>
+        <input placeholder="Name" value={setupName} onChange={e => setSetupName(e.target.value)} style={{ fontSize: 12, padding: 6, marginBottom: 6, display: "block", width: 240 }} />
+        <input placeholder="Relationship (optional)" value={setupRelationship} onChange={e => setSetupRelationship(e.target.value)} style={{ fontSize: 12, padding: 6, marginBottom: 8, display: "block", width: 240 }} />
+        <Btn onClick={handleCreateAgent} disabled={busy === "agent" || !setupName}>{busy === "agent" ? "Creating..." : "Create"}</Btn>
+        {agentResult && <p style={{ fontSize: 12, color: G, marginTop: 8 }}>Created: {agentResult.agent_id}</p>}
+      </div>
+
+      <div style={stepStyle}>
+        <div style={labelStyle}>Step 4 — Connect Accounts (optional, for richer personas)</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {["google", "spotify", "twitter"].map(p => (
+            <Btn key={p} outline onClick={() => connectSocial(p)} disabled={busy === p}>{p}</Btn>
+          ))}
+        </div>
+        <div style={{ marginTop: 12, fontSize: 8, letterSpacing: "0.1em", textTransform: "uppercase", color: "#999" }}>Or upload an export</div>
+        <div style={{ display: "flex", gap: 12, marginTop: 6, flexWrap: "wrap" }}>
+          {["whatsapp", "meta", "tiktok"].map(p => (
+            <label key={p} style={{ fontSize: 12 }}>{p}: <input type="file" disabled={busy === `import_${p}`} onChange={e => handleImportUpload(p, e)} /></label>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
